@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出雲スポットシェア - Izumo Spot Nav</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Noto Sans JP) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        izumo: {
+                            red: '#C8392B',      // 朱赤（鳥居・お祝い）
+                            redhover: '#B12D20',
+                            navy: '#1E293B',     // 墨・ネイビー
+                            cream: '#FAF8F5',    // 生成り色
+                            gold: '#D97706',     // 縁結びゴールド
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #FAF8F5;
+            color: #1E293B;
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 9999px;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.22s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased selection:bg-izumo-red selection:text-white">
+
+    <!-- ヘッダー -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2 cursor-pointer" id="brand-logo">
+                <div class="w-9 h-9 rounded-full bg-izumo-red text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                    ⛩️
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-wide text-izumo-navy leading-none">出雲スポットシェア</h1>
+                    <span class="text-[10px] font-medium text-amber-800 tracking-wider">IZUMO SPOT NAV</span>
+                </div>
+            </div>
+
+            <!-- 右上 Firebase状態 ＆ ユーザー情報 -->
+            <div class="flex items-center gap-2">
+                <button id="btn-open-firebase-modal" class="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1.5 rounded-full hover:bg-amber-100 transition flex items-center gap-1">
+                    <i class="fa-solid fa-cloud text-izumo-red"></i>
+                    <span id="sync-status-badge" class="font-medium">デモモード</span>
+                </button>
+                <div id="user-profile-bar" class="hidden flex items-center gap-2 pl-2 border-l border-slate-200">
+                    <span id="display-user-name" class="text-xs font-bold text-slate-700 truncate max-w-[100px]"></span>
+                    <button id="btn-logout" class="text-xs text-slate-500 hover:text-izumo-red p-1.5 rounded-md hover:bg-slate-100 transition" title="ログアウト">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- トースト通知 -->
+    <div id="toast-container" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-sm px-4"></div>
+
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 pb-24">
+
+        <!-- 1. ログイン画面 -->
+        <section id="view-login" class="animate-fade-in max-w-md mx-auto my-8 bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-amber-900/10">
+            <div class="text-center mb-6">
+                <div class="inline-block p-3 rounded-full bg-amber-50 text-izumo-red mb-3">
+                    <i class="fa-solid fa-map-location-dot text-3xl"></i>
+                </div>
+                <h2 class="text-xl font-bold text-izumo-navy">ログイン / アカウント選択</h2>
+                <p class="text-xs text-slate-500 mt-1">お名前とパスワードを入力してアプリを開始します。</p>
+            </div>
+
+            <form id="form-login" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">お名前 (ユーザー名)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                            <i class="fa-solid fa-user"></i>
+                        </span>
+                        <input type="text" id="login-username" required placeholder="例：出雲たろう" class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">パスワード</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                            <i class="fa-solid fa-key"></i>
+                        </span>
+                        <input type="password" id="login-password" required placeholder="お好きなパスワード" class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none transition">
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">※次回も同じ名前とパスワードでログインすれば、ご自身の投稿内容の編集・削除が可能です。</p>
+                </div>
+
+                <button type="submit" class="w-full bg-izumo-red hover:bg-izumo-redhover text-white font-bold py-3 px-4 rounded-xl shadow-sm transition transform active:scale-[0.98] flex items-center justify-center gap-2">
+                    <span>アプリを開始する</span>
+                    <i class="fa-solid fa-arrow-right text-sm"></i>
+                </button>
+            </form>
+        </section>
+
+        <!-- 2. おすすめスポット一覧画面 -->
+        <section id="view-spot-list" class="hidden animate-fade-in space-y-6">
+            <!-- タイトルエリア -->
+            <div class="bg-gradient-to-r from-izumo-navy to-slate-800 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
+                <div class="relative z-10">
+                    <span class="bg-izumo-red text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-block mb-1">神々の集う街</span>
+                    <h2 class="text-xl sm:text-2xl font-black tracking-wide">出雲おすすめスポット</h2>
+                    <p class="text-xs text-slate-300 mt-1">出雲市内の観光地、ローカルグルメ、スポーツ施設をみんなで共有しよう！</p>
+                </div>
+            </div>
+
+            <!-- フィルター・ソートチップ（クリック可能・小さめ） -->
+            <div class="bg-white p-3 rounded-2xl border border-amber-900/10 shadow-sm space-y-2">
+                <div class="text-[11px] font-bold text-slate-400 px-1 flex items-center gap-1">
+                    <i class="fa-solid fa-filter text-amber-600"></i>
+                    <span>絞り込み & 並び替え</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5" id="filter-chips-container">
+                    <button data-filter-type="sort" data-value="latest" class="filter-chip active bg-izumo-red text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1">
+                        <i class="fa-regular fa-clock text-[10px]"></i>最新投稿順
+                    </button>
+                    <button data-filter-type="sort" data-value="popular" class="filter-chip bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1">
+                        <i class="fa-solid fa-heart text-izumo-red text-[10px]"></i>人気順
+                    </button>
+                    <div class="h-4 w-[1px] bg-slate-200 self-center mx-1"></div>
+                    <button data-filter-type="category" data-value="all" class="filter-chip active bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition">
+                        すべて
+                    </button>
+                    <button data-filter-type="category" data-value="food" class="filter-chip bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1">
+                        🍜 食べ物カテゴリ
+                    </button>
+                    <button data-filter-type="category" data-value="tourism" class="filter-chip bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1">
+                        ⛩️ 観光カテゴリ
+                    </button>
+                    <button data-filter-type="category" data-value="sports" class="filter-chip bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1">
+                        ⚽ スポーツカテゴリ
+                    </button>
+                </div>
+            </div>
+
+            <!-- スポットカードグリッド -->
+            <div id="spots-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+            <!-- データがゼロの場合 -->
+            <div id="empty-state" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
+                <i class="fa-solid fa-map-pin text-4xl text-slate-300 mb-2"></i>
+                <p class="text-sm font-bold text-slate-600">該当するスポットがありません</p>
+                <p class="text-xs text-slate-400 mt-1">右下の「＋」ボタンから出雲のおすすめスポットを追加してみましょう！</p>
+            </div>
+        </section>
+
+        <!-- 3. 投稿・管理画面 -->
+        <section id="view-manage" class="hidden animate-fade-in max-w-2xl mx-auto space-y-6">
+            <!-- タブ切替 -->
+            <div class="flex items-center bg-slate-200 p-1 rounded-xl">
+                <button id="tab-btn-add" class="flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition text-izumo-navy bg-white shadow-sm flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-plus-circle text-izumo-red"></i>
+                    <span>追加ボタン (新規投稿)</span>
+                </button>
+                <button id="tab-btn-my-posts" class="flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>編集削除ボタン (自分の投稿)</span>
+                </button>
+            </div>
+
+            <!-- タブ1: 追加ページ -->
+            <div id="tab-content-add" class="bg-white p-6 rounded-2xl border border-amber-900/10 shadow-sm space-y-4">
+                <div class="border-b border-slate-100 pb-3">
+                    <h3 class="font-bold text-lg text-izumo-navy">おすすめスポットの追加</h3>
+                    <p class="text-xs text-slate-500">出雲市内のイチオシスポットをみんなに共有しましょう。</p>
+                </div>
+
+                <form id="form-add-spot" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">おすすめスポット名 <span class="text-izumo-red">*</span></label>
+                        <input type="text" id="add-title" required placeholder="例: 出雲大社 参道のお蕎麦屋さん" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">おすすめスポットの住所 <span class="text-izumo-red">*</span></label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                <i class="fa-solid fa-location-dot"></i>
+                            </span>
+                            <input type="text" id="add-address" required placeholder="例: 島根県出雲市大社町..." class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-2">カテゴリ選択 <span class="text-izumo-red">*</span></label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="add-category" value="food" checked class="peer sr-only">
+                                <div class="text-center py-2.5 px-2 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-amber-50 peer-checked:border-amber-500 peer-checked:text-amber-800 text-xs font-bold transition flex flex-col items-center gap-1">
+                                    <span class="text-lg">🍜</span>
+                                    <span>食べ物カテゴリ</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="add-category" value="tourism" class="peer sr-only">
+                                <div class="text-center py-2.5 px-2 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-red-50 peer-checked:border-izumo-red peer-checked:text-izumo-red text-xs font-bold transition flex flex-col items-center gap-1">
+                                    <span class="text-lg">⛩️</span>
+                                    <span>観光カテゴリ</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="add-category" value="sports" class="peer sr-only">
+                                <div class="text-center py-2.5 px-2 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-blue-50 peer-checked:border-blue-500 peer-checked:text-blue-800 text-xs font-bold transition flex flex-col items-center gap-1">
+                                    <span class="text-lg">⚽</span>
+                                    <span>スポーツカテゴリ</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">おすすめスポットの魅力 <span class="text-xs font-normal text-slate-400">(任意)</span></label>
+                        <textarea id="add-description" rows="3" placeholder="ここのおすすめポイント、季節の見どころ、名物メニューなど..." class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none resize-none"></textarea>
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-end gap-3">
+                        <button type="button" id="btn-cancel-manage" class="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">
+                            一覧に戻る
+                        </button>
+                        <button type="submit" class="px-6 py-2.5 rounded-xl bg-izumo-red hover:bg-izumo-redhover text-white text-xs font-bold shadow-sm transition transform active:scale-95 flex items-center gap-1.5">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            <span>投稿</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- タブ2: 編集削除ページ -->
+            <div id="tab-content-my-posts" class="hidden space-y-4">
+                <div class="bg-white p-4 rounded-2xl border border-amber-900/10 shadow-sm">
+                    <h3 class="font-bold text-sm text-izumo-navy">あなたの投稿一覧（編集・削除）</h3>
+                    <p class="text-xs text-slate-500">あなたの投稿の右下にある編集・削除ボタンから書き換えや削除を行えます。</p>
+                </div>
+
+                <div id="my-spots-list" class="space-y-3"></div>
+
+                <div id="my-spots-empty" class="hidden text-center py-10 bg-white rounded-2xl border border-slate-200">
+                    <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2"></i>
+                    <p class="text-xs text-slate-500">あなたが投稿したスポットはまだありません。</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 右下 浮遊「＋」ボタン -->
+    <button id="btn-fab-add" class="fixed bottom-6 right-6 z-40 w-14 h-14 bg-izumo-red hover:bg-izumo-redhover text-white rounded-full shadow-lg flex items-center justify-center transition transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-red-300">
+        <i class="fa-solid fa-plus text-2xl"></i>
+    </button>
+
+    <!-- 編集モーダル -->
+    <div id="modal-edit" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl animate-fade-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-base text-izumo-navy flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-izumo-red"></i>
+                    <span>投稿内容の書き換え (編集)</span>
+                </h3>
+                <button type="button" class="btn-close-edit-modal text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-edit-spot" class="space-y-4">
+                <input type="hidden" id="edit-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">おすすめスポット名</label>
+                    <input type="text" id="edit-title" required class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">おすすめスポットの住所</label>
+                    <input type="text" id="edit-address" required class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">カテゴリ</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-category" value="food" class="peer sr-only">
+                            <div class="text-center py-2 px-2 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-amber-50 peer-checked:border-amber-500 text-xs font-bold">🍜 食べ物</div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-category" value="tourism" class="peer sr-only">
+                            <div class="text-center py-2 px-2 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-red-50 peer-checked:border-izumo-red text-xs font-bold">⛩️ 観光</div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-category" value="sports" class="peer sr-only">
+                            <div class="text-center py-2 px-2 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-blue-50 peer-checked:border-blue-500 text-xs font-bold">⚽ スポーツ</div>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">おすすめスポットの魅力</label>
+                    <textarea id="edit-description" rows="3" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-izumo-red outline-none resize-none"></textarea>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end gap-2">
+                    <button type="button" class="btn-close-edit-modal px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">キャンセル</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-izumo-red text-white text-xs font-bold hover:bg-izumo-redhover shadow-sm">変更を保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 削除確認モーダル -->
+    <div id="modal-delete" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl text-center space-y-4 animate-fade-in">
+            <div class="w-12 h-12 bg-red-100 text-izumo-red rounded-full flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-base text-slate-900">この投稿を削除しますか？</h3>
+                <p class="text-xs text-slate-500 mt-1">「<span id="delete-spot-title" class="font-bold text-slate-700"></span>」を削除します。</p>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+                <button type="button" id="btn-cancel-delete" class="flex-1 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50">キャンセル</button>
+                <button type="button" id="btn-confirm-delete" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm">削除する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase連携設定モーダル -->
+    <div id="modal-firebase" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl animate-fade-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-base text-izumo-navy flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-bolt text-izumo-red"></i>
+                    <span>Firebase リアルタイム共有の設定</span>
+                </h3>
+                <button type="button" id="btn-close-firebase-modal" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="text-xs text-slate-600 space-y-3 leading-relaxed">
+                <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
+                    <p class="font-bold"><i class="fa-solid fa-circle-info"></i> 現在の動作：<span id="guide-status-text">デモモード (ブラウザ保存)</span></p>
+                    <p class="mt-1 text-[11px]">設定未入力時やアクセス権限がない場合は、端末内(LocalStorage)で完全動作します。Firebaseを設定すると他ユーザーの投稿もリアルタイム共有されます。</p>
+                </div>
+
+                <div class="p-3 bg-red-50 rounded-xl border border-red-200 text-red-900 space-y-1">
+                    <p class="font-bold text-[11px]">
+                        <i class="fa-solid fa-shield-halved text-red-600"></i>
+                        <span>【重要】Firebaseセキュリティルールの許可設定</span>
+                    </p>
+                    <p class="text-[11px]">Firebase Console → Firestore Database → ルール (Rules) タブを開き、以下を貼り付けて「公開」してください：</p>
+                    <pre class="bg-white p-2 rounded text-[10px] font-mono border border-red-200 text-slate-800 overflow-x-auto">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block font-bold text-slate-700">Firebase Config (JSON形式)</label>
+                    <textarea id="input-firebase-config" rows="4" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "izumo-app.firebaseapp.com",
+  "projectId": "izumo-app",
+  "appId": "1:123456:web:abcdef"
+}' class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-izumo-red outline-none"></textarea>
+                </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-between">
+                <button type="button" id="btn-reset-firebase" class="text-xs text-slate-400 hover:text-red-600 underline">設定をクリア (デモモード)</button>
+                <button type="button" id="btn-save-firebase-config" class="px-5 py-2.5 rounded-xl bg-izumo-navy text-white text-xs font-bold hover:bg-slate-800">保存して接続</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JavaScript logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        /* 初期デモデータ */
+        const INITIAL_DEMO_SPOTS = [
+            {
+                id: 'demo-1',
+                title: '出雲大社 (いずもたいしゃ)',
+                address: '島根県出雲市大社町杵築東195',
+                category: 'tourism',
+                description: '縁結びの神様として有名な全国屈指の神社。神楽殿の大しめ縄は圧巻の迫力です！',
+                authorName: '出雲ガイド',
+                authorId: 'user_demo',
+                likes: 12,
+                likedBy: [],
+                createdAt: new Date('2026-09-20T10:00:00').toISOString()
+            },
+            {
+                id: 'demo-2',
+                title: 'そば処 荒木屋',
+                address: '島根県出雲市大社町杵築東409',
+                category: 'food',
+                description: '創業江戸時代の出雲そば老舗。風味豊かな割子そばと濃いめのツユが絶品。',
+                authorName: '出雲グルメ通',
+                authorId: 'user_demo',
+                likes: 8,
+                likedBy: [],
+                createdAt: new Date('2026-09-22T12:30:00').toISOString()
+            },
+            {
+                id: 'demo-3',
+                title: '出雲ドーム',
+                address: '島根県出雲市矢野町999',
+                category: 'sports',
+                description: '日本最大の木造ドーム施設。各種スポーツイベントやジョギングコースが人気。',
+                authorName: 'スポーツファン',
+                authorId: 'user_demo',
+                likes: 5,
+                likedBy: [],
+                createdAt: new Date('2026-09-25T15:10:00').toISOString()
+            }
+        ];
+
+        let currentUser = null; // { name, password, id }
+        let spots = [];
+        let filterCategory = 'all'; // all, food, tourism, sports
+        let sortType = 'latest';     // latest, popular
+        let pendingDeleteId = null;
+
+        let db = null;
+        let isFirebaseActive = false;
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'izumo-spot-nav';
+
+        function initStorageEngine() {
+            const savedFirebaseConfigStr = localStorage.getItem('izumo_firebase_config');
+            let fbConfig = null;
+
+            if (savedFirebaseConfigStr) {
+                try { fbConfig = JSON.parse(savedFirebaseConfigStr); } catch(e) {}
+            } else if (typeof __firebase_config !== 'undefined') {
+                try { fbConfig = JSON.parse(__firebase_config); } catch(e) {}
+            }
+
+            if (fbConfig && fbConfig.apiKey) {
+                try {
+                    const app = initializeApp(fbConfig);
+                    const auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    signInAnonymously(auth).then(() => {
+                        isFirebaseActive = true;
+                        updateSyncBadge('Firebase同期中', 'bg-emerald-50 text-emerald-800 border-emerald-300');
+                        subscribeFirestore();
+                    }).catch(err => {
+                        fallbackToLocalStorage();
+                    });
+                } catch(err) {
+                    fallbackToLocalStorage();
+                }
+            } else {
+                fallbackToLocalStorage();
+            }
+        }
+
+        function fallbackToLocalStorage() {
+            isFirebaseActive = false;
+            updateSyncBadge('デモモード (ローカル)', 'bg-amber-50 text-amber-800 border-amber-200');
+            loadLocalSpots();
+        }
+
+        function updateSyncBadge(text, className) {
+            const badge = document.getElementById('sync-status-badge');
+            if (badge) {
+                badge.textContent = text;
+                badge.parentElement.className = `text-xs border px-2.5 py-1.5 rounded-full transition flex items-center gap-1 ${className}`;
+            }
+        }
+
+        function subscribeFirestore() {
+            if (!db) return;
+            const spotsCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'spots');
+            
+            onSnapshot(spotsCol, (snapshot) => {
+                const fetched = [];
+                snapshot.forEach(docSnap => {
+                    fetched.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                
+                if (fetched.length === 0) {
+                    INITIAL_DEMO_SPOTS.forEach(async (demo) => {
+                        const { id, ...data } = demo;
+                        try { await addDoc(spotsCol, data); } catch(e) {}
+                    });
+                } else {
+                    spots = fetched;
+                    renderSpots();
+                    renderMySpots();
+                }
+            }, (error) => {
+                fallbackToLocalStorage();
+            });
+        }
+
+        function loadLocalSpots() {
+            const localData = localStorage.getItem('izumo_spots_data');
+            if (localData) {
+                try { spots = JSON.parse(localData); } catch(e) { spots = [...INITIAL_DEMO_SPOTS]; }
+            } else {
+                spots = [...INITIAL_DEMO_SPOTS];
+                saveLocalSpots();
+            }
+            renderSpots();
+            renderMySpots();
+        }
+
+        function saveLocalSpots() {
+            if (!isFirebaseActive) {
+                localStorage.setItem('izumo_spots_data', JSON.stringify(spots));
+            }
+        }
+
+        function checkSession() {
+            const sessionStr = localStorage.getItem('izumo_current_user');
+            if (sessionStr) {
+                try {
+                    currentUser = JSON.parse(sessionStr);
+                    showMainAppUI();
+                } catch(e) { showLoginUI(); }
+            } else {
+                showLoginUI();
+            }
+        }
+
+        function loginUser(username, password) {
+            const authorId = `user_${username.trim()}_${password.trim()}`;
+            currentUser = {
+                name: username.trim(),
+                password: password.trim(),
+                id: authorId
+            };
+            localStorage.setItem('izumo_current_user', JSON.stringify(currentUser));
+            showToast(`ようこそ、${currentUser.name} さん！`);
+            showMainAppUI();
+        }
+
+        function logoutUser() {
+            currentUser = null;
+            localStorage.removeItem('izumo_current_user');
+            showToast('ログアウトしました');
+            showLoginUI();
+        }
+
+        function showLoginUI() {
+            document.getElementById('view-login').classList.remove('hidden');
+            document.getElementById('view-spot-list').classList.add('hidden');
+            document.getElementById('view-manage').classList.add('hidden');
+            document.getElementById('btn-fab-add').classList.add('hidden');
+            document.getElementById('user-profile-bar').classList.add('hidden');
+        }
+
+        function showMainAppUI() {
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-spot-list').classList.remove('hidden');
+            document.getElementById('view-manage').classList.add('hidden');
+            document.getElementById('btn-fab-add').classList.remove('hidden');
+            
+            const profileBar = document.getElementById('user-profile-bar');
+            profileBar.classList.remove('hidden');
+            document.getElementById('display-user-name').textContent = currentUser.name;
+
+            renderSpots();
+        }
+
+        function navigateToManage(tab = 'add') {
+            document.getElementById('view-spot-list').classList.add('hidden');
+            document.getElementById('view-manage').classList.remove('hidden');
+            document.getElementById('btn-fab-add').classList.add('hidden');
+            switchManageTab(tab);
+        }
+
+        function navigateToHome() {
+            document.getElementById('view-manage').classList.add('hidden');
+            document.getElementById('view-spot-list').classList.remove('hidden');
+            document.getElementById('btn-fab-add').classList.remove('hidden');
+            renderSpots();
+        }
+
+        const CATEGORY_MAP = {
+            food: { label: '食べ物カテゴリ', icon: '🍜', bg: 'bg-amber-100 text-amber-800' },
+            tourism: { label: '観光カテゴリ', icon: '⛩️', bg: 'bg-red-100 text-izumo-red' },
+            sports: { label: 'スポーツカテゴリ', icon: '⚽', bg: 'bg-blue-100 text-blue-800' }
+        };
+
+        function getFilteredAndSortedSpots() {
+            let result = [...spots];
+
+            if (filterCategory !== 'all') {
+                result = result.filter(s => s.category === filterCategory);
+            }
+
+            if (sortType === 'popular') {
+                result.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            } else {
+                result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            }
+
+            return result;
+        }
+
+        function renderSpots() {
+            const container = document.getElementById('spots-grid');
+            const emptyState = document.getElementById('empty-state');
+            const list = getFilteredAndSortedSpots();
+
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            list.forEach(spot => {
+                const cat = CATEGORY_MAP[spot.category] || CATEGORY_MAP.tourism;
+                const isLiked = spot.likedBy && spot.likedBy.includes(currentUser?.id);
+                const isMyPost = currentUser && spot.authorId === currentUser.id;
+                
+                const dateStr = spot.createdAt ? new Date(spot.createdAt).toLocaleDateString('ja-JP') : '日時不明';
+
+                const cardHtml = `
+                    <div class="bg-white rounded-2xl border border-amber-900/10 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 relative">
+                        <div>
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${cat.bg} flex items-center gap-1">
+                                    <span>${cat.icon}</span>
+                                    <span>${cat.label}</span>
+                                </span>
+                                ${isMyPost ? '<span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-bold">あなたの投稿</span>' : ''}
+                            </div>
+
+                            <h3 class="text-base font-bold text-izumo-navy leading-snug">${escapeHtml(spot.title)}</h3>
+
+                            <div class="text-xs text-slate-500 mt-1.5 flex items-start gap-1">
+                                <i class="fa-solid fa-location-dot text-izumo-red mt-0.5 shrink-0"></i>
+                                <span class="flex-1">${escapeHtml(spot.address)}</span>
+                                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.address + ' ' + spot.title)}" target="_blank" rel="noopener" class="text-xs text-blue-600 hover:underline shrink-0 flex items-center gap-0.5">
+                                    <span>地図</span>
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                                </a>
+                            </div>
+
+                            ${spot.description ? `
+                                <div class="mt-3 bg-amber-50/50 p-3 rounded-xl text-xs text-slate-700 border border-amber-100/60 leading-relaxed">
+                                    ${escapeHtml(spot.description)}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                            <div class="flex items-center gap-1.5 truncate pr-2">
+                                <i class="fa-regular fa-user text-slate-400"></i>
+                                <span class="font-medium text-slate-600 truncate">${escapeHtml(spot.authorName || '匿名')}</span>
+                                <span class="text-[10px] text-slate-300">• ${dateStr}</span>
+                            </div>
+
+                            <button data-spot-id="${spot.id}" class="btn-like ${isLiked ? 'text-izumo-red bg-red-50' : 'text-slate-500 bg-slate-50 hover:bg-slate-100'} px-2.5 py-1.5 rounded-full border border-slate-200 transition flex items-center gap-1.5 shrink-0">
+                                <i class="${isLiked ? 'fa-solid' : 'fa-regular'} fa-heart text-izumo-red text-xs"></i>
+                                <span class="font-bold text-xs ${isLiked ? 'text-izumo-red' : 'text-slate-700'}">${spot.likes || 0}</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', cardHtml);
+            });
+
+            container.querySelectorAll('.btn-like').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const spotId = e.currentTarget.getAttribute('data-spot-id');
+                    toggleLike(spotId);
+                });
+            });
+        }
+
+        function renderMySpots() {
+            const container = document.getElementById('my-spots-list');
+            const emptyState = document.getElementById('my-spots-empty');
+            
+            if (!currentUser) return;
+            const mySpots = spots.filter(s => s.authorId === currentUser.id);
+
+            container.innerHTML = '';
+
+            if (mySpots.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            mySpots.forEach(spot => {
+                const cat = CATEGORY_MAP[spot.category] || CATEGORY_MAP.tourism;
+
+                const itemHtml = `
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${cat.bg}">${cat.icon} ${cat.label}</span>
+                                <h4 class="font-bold text-sm text-izumo-navy">${escapeHtml(spot.title)}</h4>
+                            </div>
+                            <p class="text-xs text-slate-500 truncate max-w-md"><i class="fa-solid fa-location-dot text-izumo-red"></i> ${escapeHtml(spot.address)}</p>
+                        </div>
+
+                        <!-- 編集ボタンと削除ボタン -->
+                        <div class="flex items-center gap-2 self-end sm:self-center shrink-0">
+                            <button data-spot-id="${spot.id}" class="btn-open-edit px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1 transition">
+                                <i class="fa-solid fa-pen text-slate-500"></i>
+                                <span>編集</span>
+                            </button>
+                            <button data-spot-id="${spot.id}" data-spot-title="${escapeHtml(spot.title)}" class="btn-open-delete px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-xs font-bold flex items-center gap-1 transition">
+                                <i class="fa-solid fa-trash"></i>
+                                <span>削除</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', itemHtml);
+            });
+
+            container.querySelectorAll('.btn-open-edit').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    openEditModal(e.currentTarget.getAttribute('data-spot-id'));
+                });
+            });
+
+            container.querySelectorAll('.btn-open-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    openDeleteModal(
+                        e.currentTarget.getAttribute('data-spot-id'),
+                        e.currentTarget.getAttribute('data-spot-title')
+                    );
+                });
+            });
+        }
+
+        async function addNewSpot(title, address, category, description) {
+            const newSpotData = {
+                title,
+                address,
+                category,
+                description,
+                authorName: currentUser.name,
+                authorId: currentUser.id,
+                likes: 0,
+                likedBy: [],
+                createdAt: new Date().toISOString()
+            };
+
+            if (isFirebaseActive && db) {
+                try {
+                    const spotsCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'spots');
+                    await addDoc(spotsCol, newSpotData);
+                } catch(err) {
+                    newSpotData.id = 'local_' + Date.now();
+                    spots.unshift(newSpotData);
+                    saveLocalSpots();
+                    renderSpots();
+                }
+            } else {
+                newSpotData.id = 'local_' + Date.now();
+                spots.unshift(newSpotData);
+                saveLocalSpots();
+                renderSpots();
+            }
+
+            showToast('おすすめスポットを投稿しました！');
+            navigateToHome();
+        }
+
+        async function updateSpot(id, title, address, category, description) {
+            if (isFirebaseActive && db) {
+                try {
+                    const spotRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'spots', id);
+                    await updateDoc(spotRef, { title, address, category, description });
+                } catch(err) {
+                    const target = spots.find(s => s.id === id);
+                    if (target) {
+                        target.title = title; target.address = address; target.category = category; target.description = description;
+                        saveLocalSpots(); renderSpots(); renderMySpots();
+                    }
+                }
+            } else {
+                const target = spots.find(s => s.id === id);
+                if (target) {
+                    target.title = title; target.address = address; target.category = category; target.description = description;
+                    saveLocalSpots(); renderSpots(); renderMySpots();
+                }
+            }
+
+            showToast('投稿内容を書き換えました');
+            closeEditModal();
+        }
+
+        async function deleteSpot(id) {
+            if (isFirebaseActive && db) {
+                try {
+                    const spotRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'spots', id);
+                    await deleteDoc(spotRef);
+                } catch(err) {
+                    spots = spots.filter(s => s.id !== id);
+                    saveLocalSpots(); renderSpots(); renderMySpots();
+                }
+            } else {
+                spots = spots.filter(s => s.id !== id);
+                saveLocalSpots(); renderSpots(); renderMySpots();
+            }
+
+            showToast('投稿を削除しました');
+            closeDeleteModal();
+        }
+
+        async function toggleLike(spotId) {
+            if (!currentUser) return;
+            const target = spots.find(s => s.id === spotId);
+            if (!target) return;
+
+            let likedBy = target.likedBy || [];
+            let likes = target.likes || 0;
+
+            const index = likedBy.indexOf(currentUser.id);
+            if (index >= 0) {
+                likedBy.splice(index, 1);
+                likes = Math.max(0, likes - 1);
+            } else {
+                likedBy.push(currentUser.id);
+                likes += 1;
+            }
+
+            if (isFirebaseActive && db) {
+                try {
+                    const spotRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'spots', spotId);
+                    await updateDoc(spotRef, { likes, likedBy });
+                } catch(err) {
+                    target.likes = likes; target.likedBy = likedBy;
+                    saveLocalSpots(); renderSpots();
+                }
+            } else {
+                target.likes = likes; target.likedBy = likedBy;
+                saveLocalSpots(); renderSpots();
+            }
+        }
+
+        function openEditModal(id) {
+            const spot = spots.find(s => s.id === id);
+            if (!spot) return;
+
+            document.getElementById('edit-id').value = spot.id;
+            document.getElementById('edit-title').value = spot.title;
+            document.getElementById('edit-address').value = spot.address;
+            document.getElementById('edit-description').value = spot.description || '';
+
+            document.querySelectorAll('input[name="edit-category"]').forEach(radio => {
+                radio.checked = (radio.value === spot.category);
+            });
+
+            document.getElementById('modal-edit').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('modal-edit').classList.add('hidden');
+        }
+
+        function openDeleteModal(id, title) {
+            pendingDeleteId = id;
+            document.getElementById('delete-spot-title').textContent = title;
+            document.getElementById('modal-delete').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            pendingDeleteId = null;
+            document.getElementById('modal-delete').classList.add('hidden');
+        }
+
+        function switchManageTab(tab) {
+            const btnAdd = document.getElementById('tab-btn-add');
+            const btnMy = document.getElementById('tab-btn-my-posts');
+            const contentAdd = document.getElementById('tab-content-add');
+            const contentMy = document.getElementById('tab-content-my-posts');
+
+            if (tab === 'add') {
+                btnAdd.className = 'flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition text-izumo-navy bg-white shadow-sm flex items-center justify-center gap-1.5';
+                btnMy.className = 'flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
+                contentAdd.classList.remove('hidden');
+                contentMy.classList.add('hidden');
+            } else {
+                btnMy.className = 'flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition text-izumo-navy bg-white shadow-sm flex items-center justify-center gap-1.5';
+                btnAdd.className = 'flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
+                contentMy.classList.remove('hidden');
+                contentAdd.classList.add('hidden');
+                renderMySpots();
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `bg-izumo-navy text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg flex items-center justify-between pointer-events-auto animate-fade-in transition`;
+            toast.innerHTML = `<div class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-sm text-izumo-red"></i><span>${escapeHtml(message)}</span></div>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 3000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[m]);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initStorageEngine();
+            checkSession();
+
+            document.getElementById('brand-logo').addEventListener('click', () => {
+                if (currentUser) navigateToHome();
+            });
+
+            document.getElementById('form-login').addEventListener('submit', (e) => {
+                e.preventDefault();
+                loginUser(
+                    document.getElementById('login-username').value,
+                    document.getElementById('login-password').value
+                );
+            });
+
+            document.getElementById('btn-logout').addEventListener('click', logoutUser);
+
+            document.getElementById('btn-fab-add').addEventListener('click', () => navigateToManage('add'));
+
+            document.getElementById('tab-btn-add').addEventListener('click', () => switchManageTab('add'));
+            document.getElementById('tab-btn-my-posts').addEventListener('click', () => switchManageTab('my'));
+
+            document.getElementById('form-add-spot').addEventListener('submit', (e) => {
+                e.preventDefault();
+                addNewSpot(
+                    document.getElementById('add-title').value,
+                    document.getElementById('add-address').value,
+                    document.querySelector('input[name="add-category"]:checked').value,
+                    document.getElementById('add-description').value
+                );
+                document.getElementById('form-add-spot').reset();
+            });
+
+            document.getElementById('btn-cancel-manage').addEventListener('click', navigateToHome);
+
+            document.getElementById('form-edit-spot').addEventListener('submit', (e) => {
+                e.preventDefault();
+                updateSpot(
+                    document.getElementById('edit-id').value,
+                    document.getElementById('edit-title').value,
+                    document.getElementById('edit-address').value,
+                    document.querySelector('input[name="edit-category"]:checked').value,
+                    document.getElementById('edit-description').value
+                );
+            });
+
+            document.querySelectorAll('.btn-close-edit-modal').forEach(btn => btn.addEventListener('click', closeEditModal));
+
+            document.getElementById('btn-confirm-delete').addEventListener('click', () => {
+                if (pendingDeleteId) deleteSpot(pendingDeleteId);
+            });
+            document.getElementById('btn-cancel-delete').addEventListener('click', closeDeleteModal);
+
+            const chipContainer = document.getElementById('filter-chips-container');
+            chipContainer.addEventListener('click', (e) => {
+                const chip = e.target.closest('.filter-chip');
+                if (!chip) return;
+
+                const filterType = chip.getAttribute('data-filter-type');
+                const value = chip.getAttribute('data-value');
+
+                if (filterType === 'sort') {
+                    sortType = value;
+                    chipContainer.querySelectorAll('[data-filter-type="sort"]').forEach(btn => {
+                        btn.className = 'filter-chip bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1';
+                    });
+                    chip.className = 'filter-chip active bg-izumo-red text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1';
+                } else if (filterType === 'category') {
+                    filterCategory = value;
+                    chipContainer.querySelectorAll('[data-filter-type="category"]').forEach(btn => {
+                        btn.className = 'filter-chip bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1';
+                    });
+                    chip.className = 'filter-chip active bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-transparent transition flex items-center gap-1';
+                }
+
+                renderSpots();
+            });
+
+            const firebaseModal = document.getElementById('modal-firebase');
+            document.getElementById('btn-open-firebase-modal').addEventListener('click', () => firebaseModal.classList.remove('hidden'));
+            document.getElementById('btn-close-firebase-modal').addEventListener('click', () => firebaseModal.classList.add('hidden'));
+
+            document.getElementById('btn-save-firebase-config').addEventListener('click', () => {
+                const val = document.getElementById('input-firebase-config').value.trim();
+                if (!val) return;
+                try {
+                    JSON.parse(val);
+                    localStorage.setItem('izumo_firebase_config', val);
+                    location.reload();
+                } catch(e) {
+                    showToast('正しいJSON形式で入力してください', 'error');
+                }
+            });
+
+            document.getElementById('btn-reset-firebase').addEventListener('click', () => {
+                localStorage.removeItem('izumo_firebase_config');
+                location.reload();
+            });
+        });
+    </script>
+</body>
+</html>
